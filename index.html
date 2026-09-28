@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10243f">
+  <meta name="description" content="Локальный журнал доставок инструментов в сервисные центры и лист водителя.">
+  <title>Доставка в СЦ — маршрутный лист</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="app-header">
+      <div class="header-inner">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">СЦ</span>
+          <div><strong>Доставка в СЦ</strong><small>Заявки и лист водителя</small></div>
+        </div>
+        <div class="header-actions">
+          <span class="local-label"><span class="local-dot" aria-hidden="true"></span> Данные на этом компьютере</span>
+          <button type="button" class="header-button" id="backupButton">Сохранить копию</button>
+          <button type="button" class="header-button" id="restoreButton">Загрузить копию</button>
+          <input id="restoreFile" type="file" accept=".json,application/json" hidden>
+        </div>
+      </div>
+    </header>
+
+    <main class="shell">
+      <div class="page-heading">
+        <div><p class="eyebrow">РАБОЧЕЕ МЕСТО</p><h1>Маршрутный лист</h1><p class="heading-note">Добавьте доставку, проверьте порядок остановок и подготовьте лист водителю.</p></div>
+        <div class="today" id="todayLabel"></div>
+      </div>
+
+      <div class="summary" aria-label="Сводка">
+        <div class="summary-item"><span>Активных заявок</span><strong id="activeCount">0</strong></div>
+        <div class="summary-item"><span>В листе водителя</span><strong id="tripCount">0</strong></div>
+        <div class="summary-item"><span>Остановок в рейсе</span><strong id="stopCount">0</strong></div>
+        <div class="summary-help">Порядок остановок: приоритет → ближайшая дата → время добавления.</div>
+      </div>
+
+      <nav class="tabs" aria-label="Разделы">
+        <button type="button" class="tab is-active" id="routeTab" aria-controls="routeView" aria-selected="true">Маршрут и заявки</button>
+        <button type="button" class="tab" id="centersTab" aria-controls="centersView" aria-selected="false">Адреса СЦ <span id="centersTabCount" class="tab-count">0</span></button>
+      </nav>
+
+      <div class="workspace" id="routeView">
+        <aside class="panel compose-panel">
+          <div class="panel-head"><div><span class="section-kicker">01 / ЗАЯВКА</span><h2 id="formHeading">Новая доставка</h2></div><span class="panel-symbol" aria-hidden="true">＋</span></div>
+          <form id="requestForm" novalidate>
+            <div class="field"><label for="ticket">Номер обращения <span class="required">*</span></label><input id="ticket" name="ticket" type="text" maxlength="80" placeholder="Например, 123456" required autocomplete="off"></div>
+            <div class="field"><label for="item">Инструмент <span class="required">*</span></label><input id="item" name="item" type="text" maxlength="160" placeholder="Наименование и модель" required autocomplete="off"></div>
+            <div class="field"><div class="field-title"><label for="centerSelect">Сервисный центр <span class="required">*</span></label><button type="button" class="inline-action" id="newCenterInline">+ Новый СЦ</button></div><select id="centerSelect" name="centerSelect" required><option value="">Выберите адрес</option></select></div>
+            <div class="center-preview" id="centerPreview" hidden>
+              <strong id="previewName"></strong><span id="previewAddress"></span><span id="previewPhone"></span>
+              <a id="previewMapLink" href="#" target="_blank" rel="noopener noreferrer">Показать в Яндекс Картах ↗</a>
+            </div>
+            <div class="form-grid">
+              <div class="field"><label for="priority">Приоритет</label><select id="priority" name="priority"><option value="normal">Обычный</option><option value="urgent">Срочно</option><option value="critical">Критично</option></select></div>
+              <div class="field"><label for="due">Доставить до</label><input id="due" name="due" type="date"></div>
+            </div>
+            <div class="field"><label for="note">Комментарий водителю</label><textarea id="note" name="note" rows="3" maxlength="800" placeholder="Что уточнить или кому передать"></textarea></div>
+            <p class="field-footnote">Дата необязательна. Новая заявка сразу попадёт в лист водителя.</p>
+            <button class="button button-primary submit-button" id="submitRequest" type="submit">Добавить в маршрут <span aria-hidden="true">↗</span></button>
+            <button class="button button-quiet cancel-edit" id="cancelEdit" type="button" hidden>Отменить редактирование</button>
+          </form>
+        </aside>
+
+        <section class="panel queue-panel" aria-labelledby="queueHeading">
+          <div class="queue-top"><div><span class="section-kicker">02 / ОЧЕРЕДЬ</span><h2 id="queueHeading">Пункты доставки</h2><p>Заявки одного СЦ собраны в одну остановку.</p></div>
+            <div class="export-actions"><button type="button" class="button button-outline" id="excelButton">↓ Excel</button><button type="button" class="button button-dark" id="printButton">▤ Печать</button></div>
+          </div>
+          <div class="queue-controls">
+            <div class="segmented" role="group" aria-label="Статус заявок"><button type="button" class="is-selected" data-filter="active" aria-pressed="true">Активные</button><button type="button" data-filter="done" aria-pressed="false">Выполненные</button></div>
+            <label class="search-box"><span class="visually-hidden">Поиск по заявкам и СЦ</span><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Поиск по обращению, СЦ, инструменту"></label>
+          </div>
+          <div id="queueList" class="queue-list" aria-live="polite"></div>
+          <div class="queue-footer"><span id="queueCaption">Отмеченные заявки попадут в печать и Excel.</span><span id="storageStatus">Сохраняется локально</span></div>
+        </section>
+      </div>
+
+      <section class="panel centers-panel" id="centersView" hidden aria-labelledby="centersHeading">
+        <div class="centers-head"><div><span class="section-kicker">СПРАВОЧНИК</span><h2 id="centersHeading">Адреса сервисных центров</h2><p>Адрес и телефон достаточно сохранить один раз — они подставятся в новые заявки.</p></div><button type="button" class="button button-primary" id="addCenterButton">+ Добавить СЦ</button></div>
+        <div id="centersList" class="centers-list" aria-live="polite"></div>
+      </section>
+      <p class="footnote">Данные хранятся в этом браузере. Для переноса на другой компьютер используйте «Сохранить копию».</p>
+    </main>
+  </div>
+
+  <section id="printSheet" class="print-sheet" aria-label="Лист водителя"></section>
+
+  <dialog id="centerDialog" class="modal" aria-labelledby="centerDialogHeading">
+    <form id="centerForm" novalidate>
+      <div class="modal-head"><div><span class="section-kicker">СПРАВОЧНИК СЦ</span><h2 id="centerDialogHeading">Добавить сервисный центр</h2></div><button type="button" class="close-modal" id="closeCenterDialog" aria-label="Закрыть">×</button></div>
+      <div class="field"><label for="centerName">Название СЦ <span class="required">*</span></label><input id="centerName" maxlength="120" required placeholder="Например, СЦ Техно"></div>
+      <div class="field"><label for="centerAddress">Полный адрес <span class="required">*</span></label><textarea id="centerAddress" maxlength="300" rows="2" required placeholder="Город, улица, дом, строение"></textarea></div>
+      <div class="field"><label for="centerPhone">Телефон СЦ <span class="required">*</span></label><input id="centerPhone" type="tel" maxlength="60" required placeholder="+7 ..."></div>
+      <div class="field"><label for="centerMap">Точная ссылка на точку в Яндекс Картах <span class="optional">необязательно</span></label><input id="centerMap" type="url" placeholder="https://yandex.ru/maps/-/..."><small class="field-hint">Если оставить пустым, Карты найдут адрес по тексту. Ссылку на конкретную точку можно скопировать через «Поделиться» в Картах.</small></div>
+      <div class="modal-actions"><button type="button" class="button button-outline" id="checkCenterMap">Проверить на карте ↗</button><button type="submit" class="button button-primary" id="saveCenterButton">Сохранить СЦ</button></div>
+    </form>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
